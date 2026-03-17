@@ -73,7 +73,7 @@ jobs:
         run: |
           git fetch origin
           git tag "co/${{ env.stem }}/${{ env.phase }}" "${{ github.event.pull_request.merge_commit_sha }}"
-          git push origin "co/${{ env.stem }}/${{ env.phase }}"
+          git push origin "refs/tags/co/${{ env.stem }}/${{ env.phase }}"
 
       - name: Advance to next phase or finalize
         working-directory: ${{ vars.BATON_REPO_PATH }}
