@@ -134,4 +134,4 @@ jobs:
             --repo "${{ github.repository }}"
 
       - name: Remove baton:revise label
-        run: gh pr edit "${{ github.event.pull_request.number }}" --remove-label "baton:revise"
+        run: gh pr edit "${{ github.event.pull_request.number }}" --remove-label "baton:revise" --repo "${{ github.repository }}"
