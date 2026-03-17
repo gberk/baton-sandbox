@@ -21,7 +21,7 @@ on:
 
   pull_request:
     types: [labeled, closed]
-    branches: ['co/*']
+    branches: ['co/*/base']
 
 jobs:
   run-phase:
@@ -61,7 +61,8 @@ jobs:
         run: |
           BASE_REF="${{ github.event.pull_request.base.ref }}"
           HEAD_REF="${{ github.event.pull_request.head.ref }}"
-          STEM="${BASE_REF#co/}"
+          STEM_BASE="${BASE_REF#co/}"
+          STEM="${STEM_BASE%/base}"
           PHASE="${HEAD_REF#co/${STEM}/}"
           echo "stem=$STEM" >> $GITHUB_ENV
           echo "phase=$PHASE" >> $GITHUB_ENV
@@ -82,7 +83,7 @@ jobs:
               --title "co: ${{ env.stem }}" \
               --body "All phases complete. Merging change order \`${{ env.stem }}\` to main." \
               --base main \
-              --head "co/${{ env.stem }}" \
+              --head "co/${{ env.stem }}/base" \
               --repo "${{ github.repository }}"
           else
             git push origin "origin/co/${{ env.stem }}:refs/heads/co/${{ env.stem }}/$NEXT"
@@ -113,7 +114,8 @@ jobs:
         run: |
           BASE_REF="${{ github.event.pull_request.base.ref }}"
           HEAD_REF="${{ github.event.pull_request.head.ref }}"
-          STEM="${BASE_REF#co/}"
+          STEM_BASE="${BASE_REF#co/}"
+          STEM="${STEM_BASE%/base}"
           PHASE="${HEAD_REF#co/${STEM}/}"
           echo "stem=$STEM" >> $GITHUB_ENV
           echo "phase=$PHASE" >> $GITHUB_ENV
