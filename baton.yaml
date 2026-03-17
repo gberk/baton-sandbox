@@ -1,0 +1,4 @@
+project: BatonSandbox
+phases:
+  - spec
+  - code

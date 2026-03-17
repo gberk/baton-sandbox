@@ -1,0 +1,133 @@
+name: Baton Pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      stem:
+        description: 'CO stem (e.g. feat_my_feature)'
+        required: true
+      phase:
+        description: 'Phase (spec, code)'
+        required: true
+        default: 'spec'
+      iteration:
+        description: 'Iteration number'
+        required: true
+        default: '1'
+      pr_url:
+        description: 'PR URL (revision rounds only)'
+        required: false
+        default: ''
+
+  pull_request:
+    types: [labeled, closed]
+    branches: ['co/*']
+
+jobs:
+  run-phase:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: self-hosted
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Sync repo
+        working-directory: ${{ vars.BATON_REPO_PATH }}
+        run: git fetch origin
+
+      - name: Run dispatch
+        working-directory: ${{ vars.BATON_REPO_PATH }}
+        run: |
+          ARGS="--stem ${{ inputs.stem }} --phase ${{ inputs.phase }} --iteration ${{ inputs.iteration }}"
+          if [ -n "${{ inputs.pr_url }}" ]; then
+            ARGS="$ARGS --pr-url ${{ inputs.pr_url }}"
+          fi
+          baton dispatch $ARGS
+
+  advance-phase:
+    if: github.event_name == 'pull_request' && github.event.pull_request.merged == true
+    runs-on: self-hosted
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Sync repo
+        working-directory: ${{ vars.BATON_REPO_PATH }}
+        run: git fetch origin
+
+      - name: Determine stem and phase
+        run: |
+          BASE_REF="${{ github.event.pull_request.base.ref }}"
+          HEAD_REF="${{ github.event.pull_request.head.ref }}"
+          STEM="${BASE_REF#co/}"
+          PHASE="${HEAD_REF#co/${STEM}/}"
+          echo "stem=$STEM" >> $GITHUB_ENV
+          echo "phase=$PHASE" >> $GITHUB_ENV
+
+      - name: Tag the merge commit
+        working-directory: ${{ vars.BATON_REPO_PATH }}
+        run: |
+          git fetch origin
+          git tag "co/${{ env.stem }}/${{ env.phase }}" "${{ github.event.pull_request.merge_commit_sha }}"
+          git push origin "co/${{ env.stem }}/${{ env.phase }}"
+
+      - name: Advance to next phase or finalize
+        working-directory: ${{ vars.BATON_REPO_PATH }}
+        run: |
+          NEXT=$(baton next-phase --current "${{ env.phase }}" 2>/dev/null || echo "")
+          if [ -z "$NEXT" ]; then
+            gh pr create \
+              --title "co: ${{ env.stem }}" \
+              --body "All phases complete. Merging change order \`${{ env.stem }}\` to main." \
+              --base main \
+              --head "co/${{ env.stem }}" \
+              --repo "${{ github.repository }}"
+          else
+            git push origin "origin/co/${{ env.stem }}:refs/heads/co/${{ env.stem }}/$NEXT"
+            gh workflow run baton.yml \
+              --ref main \
+              -f stem="${{ env.stem }}" \
+              -f phase="$NEXT" \
+              -f iteration=1 \
+              --repo "${{ github.repository }}"
+          fi
+
+  handle-revise:
+    if: >
+      github.event_name == 'pull_request' &&
+      github.event.action == 'labeled' &&
+      github.event.label.name == 'baton:revise'
+    runs-on: self-hosted
+    permissions:
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Sync repo
+        working-directory: ${{ vars.BATON_REPO_PATH }}
+        run: git fetch origin
+
+      - name: Extract stem, phase, and PR URL
+        run: |
+          BASE_REF="${{ github.event.pull_request.base.ref }}"
+          HEAD_REF="${{ github.event.pull_request.head.ref }}"
+          STEM="${BASE_REF#co/}"
+          PHASE="${HEAD_REF#co/${STEM}/}"
+          echo "stem=$STEM" >> $GITHUB_ENV
+          echo "phase=$PHASE" >> $GITHUB_ENV
+          echo "pr_url=${{ github.event.pull_request.html_url }}" >> $GITHUB_ENV
+
+      - name: Dispatch revision
+        run: |
+          gh workflow run baton.yml \
+            --ref main \
+            -f stem="${{ env.stem }}" \
+            -f phase="${{ env.phase }}" \
+            -f iteration=2 \
+            -f pr_url="${{ env.pr_url }}" \
+            --repo "${{ github.repository }}"
+
+      - name: Remove baton:revise label
+        run: gh pr edit "${{ github.event.pull_request.number }}" --remove-label "baton:revise"
