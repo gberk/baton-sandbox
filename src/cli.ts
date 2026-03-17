@@ -2,6 +2,7 @@
 import { Command } from 'commander';
 import { helloCommand } from './commands/hello.js';
 import { goodbyeCommand } from './commands/goodbye.js';
+import { shoutCommand } from './commands/shout.js';
 
 const program = new Command();
 
@@ -12,5 +13,6 @@ program
 
 program.addCommand(helloCommand());
 program.addCommand(goodbyeCommand());
+program.addCommand(shoutCommand());
 
 program.parse();
