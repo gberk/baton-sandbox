@@ -19,7 +19,7 @@ on:
         required: false
         default: ''
 
-  pull_request:
+  pull_request_target:
     types: [labeled, closed]
     branches: ['co/*/base']
 
@@ -45,7 +45,7 @@ jobs:
           baton dispatch $ARGS
 
   advance-phase:
-    if: github.event_name == 'pull_request' && github.event.pull_request.merged == true
+    if: github.event_name == 'pull_request_target' && github.event.pull_request.merged == true
     runs-on: self-hosted
     permissions:
       contents: write
@@ -97,7 +97,7 @@ jobs:
 
   handle-revise:
     if: >
-      github.event_name == 'pull_request' &&
+      github.event_name == 'pull_request_target' &&
       github.event.action == 'labeled' &&
       github.event.label.name == 'baton:revise'
     runs-on: self-hosted
