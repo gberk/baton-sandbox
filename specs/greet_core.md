@@ -19,3 +19,13 @@ Goodbye, <name>!
 ```
 
 The name is required. If omitted, the command prints a usage error.
+
+## shout
+
+`greet shout <name>` prints an emphatic, uppercase greeting to stdout:
+
+```
+HELLO, <NAME>!
+```
+
+The name is uppercased. The name is required. If omitted, the command prints a usage error.
